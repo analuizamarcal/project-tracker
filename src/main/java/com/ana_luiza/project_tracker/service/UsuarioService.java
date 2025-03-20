@@ -3,7 +3,6 @@ package com.ana_luiza.project_tracker.service;
 import com.ana_luiza.project_tracker.model.Usuario;
 import com.ana_luiza.project_tracker.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,9 +12,6 @@ public class UsuarioService {
 	
 	@Autowired
 	private UsuarioRepository usuarioRepository;
-	
-	@Autowired
-	private PasswordEncoder passwordEncoder;
 	
 	// Cria usuário
 	public Usuario criarUsuario(Usuario usuario) {
@@ -29,8 +25,8 @@ public class UsuarioService {
 	        }
 	    }
 
-	 // Criptografa a senha antes de salvar
-	    usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));
+	 /* Criptografa a senha antes de salvar
+	    usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));*/
 	    
 	    // Salva e retorna o usuário criado
 	    return usuarioRepository.save(usuario);
@@ -68,7 +64,7 @@ public class UsuarioService {
 	// Altera senha do usuário
 	public void alterarSenha(Long id, String novaSenha) {
 	    Usuario usuario = buscarUsuarioPorId(id);
-	    usuario.setSenha(passwordEncoder.encode(novaSenha)); // Atualiza senha do usuário
+	    usuario.setSenha(novaSenha); // Atualiza senha do usuário
 	    
 	 // Salva nova senha do usuário
 	    usuarioRepository.save(usuario); 
