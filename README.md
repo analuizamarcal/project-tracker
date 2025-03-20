@@ -28,9 +28,4 @@ Em desenvolvimento
 
 3. Execute o projeto com:  
    ```bash
-   mvn spring-boot:run
-
-## Próximos passos  
-- [ ] Implementar autenticação de usuários  
-- [ ] Criar interface gráfica 
-- [ ] Melhorar a documentação  
+   mvn spring-boot:run  
