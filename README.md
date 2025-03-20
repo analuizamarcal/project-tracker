@@ -29,3 +29,5 @@ Em desenvolvimento
 3. Execute o projeto com:  
    ```bash
    mvn spring-boot:run  
+
+💡 *Projeto em desenvolvimento por [Ana Luiza Marçal Freitas](https://github.com/analuizamarcal).* 
