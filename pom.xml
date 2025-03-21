@@ -56,7 +56,6 @@
 		<dependency>
 		    <groupId>org.projectlombok</groupId>
 		    <artifactId>lombok</artifactId>
-		    <scope>provided</scope> <!-- Mantém Lombok apenas no ambiente de desenvolvimento -->
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

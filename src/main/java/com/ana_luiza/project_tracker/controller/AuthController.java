@@ -4,6 +4,8 @@ import com.ana_luiza.project_tracker.dto.LoginRequest;
 import com.ana_luiza.project_tracker.model.Usuario;
 import com.ana_luiza.project_tracker.security.JwtService;
 import com.ana_luiza.project_tracker.repository.UsuarioRepository;
+
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @PreAuthorize("hasRole('ADMIN')") // ✅ Somente ADMIN pode criar usuários
     public String register(@RequestBody Usuario usuario) {
         usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));
         usuarioRepository.save(usuario);
@@ -35,7 +38,7 @@ public class AuthController {
         Optional<Usuario> user = usuarioRepository.findByEmail(loginRequest.getEmail());
         
         if (user.isPresent() && passwordEncoder.matches(loginRequest.getSenha(), user.get().getSenha())) {
-            return jwtService.generateToken(user.get().getEmail(), user.get().getRole().name());
+            return jwtService.generateToken(user.get().getEmail(),user.get().getId(), user.get().getRole().name());
         }
 
         return "Credenciais inválidas!";

@@ -1,12 +1,17 @@
 package com.ana_luiza.project_tracker.service;
 
+import com.ana_luiza.project_tracker.dto.UsuarioDTO;
 import com.ana_luiza.project_tracker.model.Usuario;
+import com.ana_luiza.project_tracker.model.Usuario.Role;
 import com.ana_luiza.project_tracker.repository.UsuarioRepository;
+import com.ana_luiza.project_tracker.security.JwtService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UsuarioService {
@@ -16,6 +21,9 @@ public class UsuarioService {
 	
 	@Autowired
 	private PasswordEncoder passwordEncoder;
+	
+	@Autowired
+	private JwtService jwtService;
 	
 	// Cria usuário
 	public Usuario criarUsuario(Usuario usuario) {
@@ -36,9 +44,17 @@ public class UsuarioService {
 	    return usuarioRepository.save(usuario);
 	}
 
-	// Lista usuários
-	public List<Usuario> listarUsuarios() {
-		return usuarioRepository.findAll();
+	public List<UsuarioDTO> listarUsuarios() {
+	    return usuarioRepository.findAll().stream()
+	        .map(usuario -> {
+	        	UsuarioDTO dto = new UsuarioDTO();
+	        	dto.setId(usuario.getId());
+	        	dto.setNome(usuario.getNome());
+	        	dto.setEmail(usuario.getEmail());
+	        	dto.setRole(usuario.getRole().name()); // Se for um enum, converter para String
+	        	return dto;
+	        })
+	    .collect(Collectors.toList());
 	}
 	
 	// Busca usuário pelo ID
@@ -54,30 +70,53 @@ public class UsuarioService {
 	        .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 	}
 	
-	// Atualiza usuário
+	// Atualiza usuário com validação de permissão
 	public Usuario atualizarUsuario(Long id, Usuario usuarioAtualizado) {
-	    Usuario usuario = buscarUsuarioPorId(id);
-	    usuario.setNome(usuarioAtualizado.getNome()); // Atualiza nome do usuário
-	    usuario.setEmail(usuarioAtualizado.getEmail()); // Atualiza email do usuário
-	    usuario.setRole(usuarioAtualizado.getRole()); // Atualiza role do usuário
+		Long authenticatedUserId = jwtService.getAuthenticatedUserId(); // Obtém o ID do usuário autenticado
+		Usuario authenticatedUser = buscarUsuarioPorId(authenticatedUserId); // Busca o usuário autenticado
 
-	    // Salva novas informações do usuário
-	    return usuarioRepository.save(usuario);
+		boolean isAdmin = authenticatedUser.getRole().equals(Role.ADMIN);
+		boolean isOwner = authenticatedUserId.equals(id);
+
+		if (!isAdmin && !isOwner) {
+			throw new RuntimeException("Você não tem permissão para editar este usuário.");
+		}
+
+		Usuario usuario = buscarUsuarioPorId(id);
+		usuario.setNome(usuarioAtualizado.getNome());
+		usuario.setEmail(usuarioAtualizado.getEmail());
+		usuario.setRole(usuarioAtualizado.getRole());
+
+		return usuarioRepository.save(usuario);
 	}
 	
-	// Altera senha do usuário
+	// Altera senha do usuário com validação de permissão
 	public void alterarSenha(Long id, String novaSenha) {
-	    Usuario usuario = buscarUsuarioPorId(id);
-	    usuario.setSenha(passwordEncoder.encode(novaSenha)); // Atualiza senha do usuário
-	    
-	 // Salva nova senha do usuário
-	    usuarioRepository.save(usuario); 
+		Long authenticatedUserId = jwtService.getAuthenticatedUserId();
+		boolean isOwner = authenticatedUserId.equals(id);
+	
+		if (!isOwner) {
+		    throw new RuntimeException("Você não tem permissão para alterar esta senha.");
+		}
+	
+		Usuario usuario = buscarUsuarioPorId(id);
+		usuario.setSenha(passwordEncoder.encode(novaSenha));
+		usuarioRepository.save(usuario);
 	}
 
-
-	// Exclui usuário
+	// Exclui usuário com validação de permissão
 	public void excluirUsuario(Long id) {
-	    Usuario usuario = buscarUsuarioPorId(id);
-	    usuarioRepository.delete(usuario);
+		Long authenticatedUserId = jwtService.getAuthenticatedUserId();
+		Usuario authenticatedUser = buscarUsuarioPorId(authenticatedUserId);
+
+		boolean isAdmin = authenticatedUser.getRole().equals(Role.ADMIN);
+		boolean isOwner = authenticatedUserId.equals(id);
+
+		if (!isAdmin && !isOwner) {
+		    throw new RuntimeException("Você não tem permissão para excluir este usuário.");
+		}
+
+		Usuario usuario = buscarUsuarioPorId(id);
+		usuarioRepository.delete(usuario);
 	}
 }
