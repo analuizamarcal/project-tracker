@@ -29,8 +29,8 @@ public class Usuario {
 	private Role role;
 	
 	public enum Role {
-		ADMIN,
-		CONSULTOR,
-		CLIENTE
+		ADMIN, // Gerencia usuários, projetos e acessa todos os relatórios.
+		CONSULTOR, // Acompanha projetos, gera insights e sugere melhorias com base nos dados
+		CLIENTE // Visualiza apenas os projetos e relatórios da sua empresa
 	}
 }
