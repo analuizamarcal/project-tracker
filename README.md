@@ -16,7 +16,7 @@ Em desenvolvimento
 
 - **Java** + **Spring Boot**
 - **MySQL**
-- **JWT para autenticação** *(planejado)*
+- **JWT para autenticação**
 
 ## Como executar o projeto
 
@@ -24,7 +24,7 @@ Em desenvolvimento
    ```bash
    git clone https://github.com/seu-usuario/project-tracker.git
 
-2. Configure o banco de dados no arquivo `.env` *(ou application.properties)*
+2. Configure o banco de dados dentro de um arquivo `.env` *(ou application.properties)*
 
 3. Execute o projeto com:  
    ```bash
