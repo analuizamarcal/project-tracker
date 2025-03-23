@@ -1,8 +1,9 @@
 package com.ana_luiza.project_tracker.controller;
 
-import com.ana_luiza.project_tracker.dto.TarefaDTO;
+import com.ana_luiza.project_tracker.dto.TarefaCreateDTO;
+import com.ana_luiza.project_tracker.dto.TarefaViewDTO;
 import com.ana_luiza.project_tracker.service.TarefaService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -11,48 +12,63 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/tarefas")
-@RequiredArgsConstructor
 public class TarefaController {
 
-    private final TarefaService tarefaService;
+    @Autowired
+    private TarefaService tarefaService;
 
-    // Criar uma tarefa (somente dono do projeto)
-    @PostMapping("/{projetoId}")
-    @PreAuthorize("@projetoService.usuarioTemAcesso(#projetoId)")
-    public ResponseEntity<TarefaDTO> criarTarefa(@PathVariable Long projetoId, @RequestBody TarefaDTO tarefaDTO) {
-        TarefaDTO tarefaCriada = tarefaService.criarTarefa(projetoId, tarefaDTO);
-        return ResponseEntity.ok(tarefaCriada);
+    // Busca todas as tarefas
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR')")
+    public List<TarefaViewDTO> findAll() {
+        return tarefaService.findAll();
     }
 
-    // Listar todas as tarefas de um projeto (somente ADMIN ou dono do projeto)
-    @GetMapping("/{projetoId}")
-    @PreAuthorize("hasRole('ADMIN') or @projetoService.usuarioTemAcesso(#projetoId)")
-    public ResponseEntity<List<TarefaDTO>> listarTarefas(@PathVariable Long projetoId) {
-        List<TarefaDTO> tarefas = tarefaService.listarTarefas(projetoId);
+    // Busca uma tarefa por ID
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR') or @tarefaService.isResponsavel(#id, authentication.principal.id)")
+    public ResponseEntity<TarefaViewDTO> findById(@PathVariable Long id) {
+        TarefaViewDTO tarefaDTO = tarefaService.findById(id);
+        return ResponseEntity.ok(tarefaDTO);
+    }
+
+    // Busca tarefas por ID do projeto
+    @GetMapping("/projeto/{projetoId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR') or @projetoService.isOwner(#projetoId, authentication.principal.id)")
+    public ResponseEntity<List<TarefaViewDTO>> findByProjetoId(@PathVariable Long projetoId) {
+        List<TarefaViewDTO> tarefas = tarefaService.findByProjetoId(projetoId);
         return ResponseEntity.ok(tarefas);
     }
 
-    // Buscar uma tarefa específica (somente ADMIN ou dono do projeto)
-    @GetMapping("/detalhes/{tarefaId}")
-    @PreAuthorize("hasRole('ADMIN') or @projetoService.usuarioTemAcesso(@tarefaService.buscarProjetoIdPorTarefa(#tarefaId))")
-    public ResponseEntity<TarefaDTO> buscarTarefaPorId(@PathVariable Long tarefaId) {
-        TarefaDTO tarefa = tarefaService.buscarTarefaPorId(tarefaId);
-        return ResponseEntity.ok(tarefa);
+    // Busca tarefas por ID do responsável (usuário)
+    @GetMapping("/responsavel/{responsavelId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR') or #responsavelId == authentication.principal.id")
+    public ResponseEntity<List<TarefaViewDTO>> findByResponsavelId(@PathVariable Long responsavelId) {
+        List<TarefaViewDTO> tarefas = tarefaService.findByResponsavelId(responsavelId);
+        return ResponseEntity.ok(tarefas);
     }
 
-    // Atualizar uma tarefa (somente dono do projeto)
-    @PutMapping("/{tarefaId}")
-    @PreAuthorize("@projetoService.usuarioTemAcesso(@tarefaService.buscarProjetoIdPorTarefa(#tarefaId))")
-    public ResponseEntity<TarefaDTO> atualizarTarefa(@PathVariable Long tarefaId, @RequestBody TarefaDTO tarefaDTO) {
-        TarefaDTO tarefaAtualizada = tarefaService.atualizarTarefa(tarefaId, tarefaDTO);
-        return ResponseEntity.ok(tarefaAtualizada);
+    // Cria uma nova tarefa
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR')")
+    public ResponseEntity<TarefaViewDTO> create(@RequestBody TarefaCreateDTO tarefaDTO) {
+        TarefaViewDTO novaTarefaDTO = tarefaService.create(tarefaDTO);
+        return ResponseEntity.ok(novaTarefaDTO);
     }
 
-    // Excluir uma tarefa (somente dono do projeto)
-    @DeleteMapping("/{tarefaId}")
-    @PreAuthorize("@projetoService.usuarioTemAcesso(@tarefaService.buscarProjetoIdPorTarefa(#tarefaId))")
-    public ResponseEntity<Void> excluirTarefa(@PathVariable Long tarefaId) {
-        tarefaService.excluirTarefa(tarefaId);
+    // Atualiza uma tarefa existente
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or @tarefaService.isResponsavel(#id, authentication.principal.id)")
+    public ResponseEntity<TarefaViewDTO> update(@PathVariable Long id, @RequestBody TarefaCreateDTO tarefaDTO) {
+        TarefaViewDTO tarefaAtualizadaDTO = tarefaService.update(id, tarefaDTO);
+        return ResponseEntity.ok(tarefaAtualizadaDTO);
+    }
+
+    // Deleta uma tarefa
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or @tarefaService.isResponsavel(#id, authentication.principal.id)")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        tarefaService.delete(id);
         return ResponseEntity.noContent().build();
     }
 }

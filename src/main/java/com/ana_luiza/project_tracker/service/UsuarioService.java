@@ -1,11 +1,9 @@
 package com.ana_luiza.project_tracker.service;
 
-import com.ana_luiza.project_tracker.dto.UsuarioDTO;
+import com.ana_luiza.project_tracker.dto.UsuarioCreateDTO;
+import com.ana_luiza.project_tracker.dto.UsuarioViewDTO;
 import com.ana_luiza.project_tracker.model.Usuario;
-import com.ana_luiza.project_tracker.model.Usuario.Role;
 import com.ana_luiza.project_tracker.repository.UsuarioRepository;
-import com.ana_luiza.project_tracker.security.JwtService;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,108 +13,72 @@ import java.util.stream.Collectors;
 
 @Service
 public class UsuarioService {
-	
-	@Autowired
-	private UsuarioRepository usuarioRepository;
-	
-	@Autowired
-	private PasswordEncoder passwordEncoder;
-	
-	@Autowired
-	private JwtService jwtService;
-	
-	// Cria usuário
-	public Usuario criarUsuario(Usuario usuario) {
-		// Verifica se o e-mail já está cadastrado
-	    try {
-	        buscarUsuarioPorEmail(usuario.getEmail());
-	        throw new RuntimeException("Email já cadastrado!");
-	    } catch (RuntimeException e) {
-	        if (!e.getMessage().equals("Usuário não encontrado!")) {
-	            throw e;
-	        }
-	    }
-	    
-	    // Criptografa a senha antes de salvar
-        usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));
-	    
-	    // Salva e retorna o usuário criado
-	    return usuarioRepository.save(usuario);
-	}
 
-	public List<UsuarioDTO> listarUsuarios() {
-	    return usuarioRepository.findAll().stream()
-	        .map(usuario -> {
-	        	UsuarioDTO dto = new UsuarioDTO();
-	        	dto.setId(usuario.getId());
-	        	dto.setNome(usuario.getNome());
-	        	dto.setEmail(usuario.getEmail());
-	        	dto.setRole(usuario.getRole().name()); // Se for um enum, converter para String
-	        	return dto;
-	        })
-	    .collect(Collectors.toList());
-	}
-	
-	// Busca usuário pelo ID
-	public Usuario buscarUsuarioPorId(Long id) {
-		// Retorna usuário caso encontrado
-	    return usuarioRepository.findById(id)
-	        .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
-	}
-	
-	// Busca usuário pelo email
-	public Usuario buscarUsuarioPorEmail(String email) {
-	    return usuarioRepository.findByEmail(email)
-	        .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
-	}
-	
-	// Atualiza usuário com validação de permissão
-	public Usuario atualizarUsuario(Long id, Usuario usuarioAtualizado) {
-		Long authenticatedUserId = jwtService.getAuthenticatedUserId(); // Obtém o ID do usuário autenticado
-		Usuario authenticatedUser = buscarUsuarioPorId(authenticatedUserId); // Busca o usuário autenticado
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder; // Para criptografar senhas (caso esteja usando segurança)
 
-		boolean isAdmin = authenticatedUser.getRole().equals(Role.ADMIN);
-		boolean isOwner = authenticatedUserId.equals(id);
+    // Método para buscar todos os usuários
+    public List<UsuarioViewDTO> findAll() {
+        return usuarioRepository.findAll()
+                .stream()
+                .map(UsuarioViewDTO::fromUsuario) // Converte cada Usuario para UsuarioDTO
+                .collect(Collectors.toList());
+    }
 
-		if (!isAdmin && !isOwner) {
-			throw new RuntimeException("Você não tem permissão para editar este usuário.");
-		}
+    // Método para buscar um usuário por ID
+    public UsuarioViewDTO findById(Long id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        return UsuarioViewDTO.fromUsuario(usuario); // Converte para UsuarioDTO
+    }
 
-		Usuario usuario = buscarUsuarioPorId(id);
-		usuario.setNome(usuarioAtualizado.getNome());
-		usuario.setEmail(usuarioAtualizado.getEmail());
-		usuario.setRole(usuarioAtualizado.getRole());
+    // Criar um novo usuário
+    public UsuarioViewDTO create(UsuarioCreateDTO usuarioDTO) {
+        Usuario usuario = new Usuario();
+        usuario.setNome(usuarioDTO.getNome());
+        usuario.setEmail(usuarioDTO.getEmail());
+        usuario.setRole(Usuario.Role.valueOf(usuarioDTO.getRole())); // Define a role
+        usuario.setSenha(passwordEncoder.encode(usuarioDTO.getSenha())); // Criptografa a senha
 
-		return usuarioRepository.save(usuario);
-	}
-	
-	// Altera senha do usuário com validação de permissão
-	public void alterarSenha(Long id, String novaSenha) {
-		Long authenticatedUserId = jwtService.getAuthenticatedUserId();
-		boolean isOwner = authenticatedUserId.equals(id);
-	
-		if (!isOwner) {
-		    throw new RuntimeException("Você não tem permissão para alterar esta senha.");
-		}
-	
-		Usuario usuario = buscarUsuarioPorId(id);
-		usuario.setSenha(passwordEncoder.encode(novaSenha));
-		usuarioRepository.save(usuario);
-	}
+        Usuario novoUsuario = usuarioRepository.save(usuario);
+        return UsuarioViewDTO.fromUsuario(novoUsuario); // Converte para UsuarioViewDTO
+    }
 
-	// Exclui usuário com validação de permissão
-	public void excluirUsuario(Long id) {
-		Long authenticatedUserId = jwtService.getAuthenticatedUserId();
-		Usuario authenticatedUser = buscarUsuarioPorId(authenticatedUserId);
+    // Atualizar um usuário existente (sem alterar senha diretamente)
+    public UsuarioViewDTO update(Long id, UsuarioCreateDTO usuarioDTO) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
-		boolean isAdmin = authenticatedUser.getRole().equals(Role.ADMIN);
-		boolean isOwner = authenticatedUserId.equals(id);
+        usuario.setNome(usuarioDTO.getNome());
+        usuario.setEmail(usuarioDTO.getEmail());
+        usuario.setRole(Usuario.Role.valueOf(usuarioDTO.getRole()));
 
-		if (!isAdmin && !isOwner) {
-		    throw new RuntimeException("Você não tem permissão para excluir este usuário.");
-		}
+        Usuario usuarioAtualizado = usuarioRepository.save(usuario);
+        return UsuarioViewDTO.fromUsuario(usuarioAtualizado); // Converte para UsuarioViewDTO
+    }
+    
+    // Alterar senha do usuário
+    public void alterarSenha(Long id, String senhaAtual, String novaSenha) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
-		Usuario usuario = buscarUsuarioPorId(id);
-		usuarioRepository.delete(usuario);
-	}
+        // Verifica se a senha atual está correta
+        if (!passwordEncoder.matches(senhaAtual, usuario.getSenha())) {
+            throw new RuntimeException("Senha atual incorreta");
+        }
+
+        // Atualiza a senha com a nova senha criptografada
+        usuario.setSenha(passwordEncoder.encode(novaSenha));
+        usuarioRepository.save(usuario);
+    }
+
+    // Método para deletar um usuário
+    public void delete(Long id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        usuarioRepository.delete(usuario);
+    }
 }

@@ -1,8 +1,10 @@
 package com.ana_luiza.project_tracker.controller;
 
-import com.ana_luiza.project_tracker.dto.ProjetoDTO;
+import com.ana_luiza.project_tracker.dto.ProjetoCreateDTO;
+import com.ana_luiza.project_tracker.dto.ProjetoViewDTO;
 import com.ana_luiza.project_tracker.service.ProjetoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,48 +14,53 @@ import java.util.List;
 @RequestMapping("/projetos")
 public class ProjetoController {
 
-    private final ProjetoService projetoService;
-
     @Autowired
-    public ProjetoController(ProjetoService projetoService) {
-        this.projetoService = projetoService;
-    }
+    private ProjetoService projetoService;
 
-    // Criar um novo projeto (somente usuários autenticados)
-    @PostMapping
-    @PreAuthorize("isAuthenticated()")
-    public String criarProjeto(@RequestBody ProjetoDTO projetoDTO) {
-        projetoService.criarProjeto(projetoDTO);
-        return "Projeto criado com sucesso!";
-    }
-
-    // Listar todos os projetos do usuário autenticado
+    // Busca todos os projetos
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
-    public List<ProjetoDTO> listarProjetos() {
-        return projetoService.listarProjetos();
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<ProjetoViewDTO> findAll() {
+        return projetoService.findAll();
     }
 
-    // Buscar um projeto por ID (somente o dono do projeto ou ADMIN)
+    // Busca um projeto por ID
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @projetoService.usuarioTemAcesso(#id)")
-    public ProjetoDTO buscarProjetoPorId(@PathVariable Long id) {
-        return projetoService.buscarProjetoPorId(id);
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR') or @projetoService.isOwner(#id, authentication.principal.id)")
+    public ResponseEntity<ProjetoViewDTO> findById(@PathVariable Long id) {
+        ProjetoViewDTO projetoDTO = projetoService.findById(id);
+        return ResponseEntity.ok(projetoDTO);
     }
 
-    // Atualizar um projeto (somente o dono do projeto ou ADMIN)
+    // Busca projetos por ID da equipe
+    @GetMapping("/equipe/{equipeId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR') or @equipeService.isMember(#equipeId, authentication.principal.id)")
+    public ResponseEntity<List<ProjetoViewDTO>> findByEquipeId(@PathVariable Long equipeId) {
+        List<ProjetoViewDTO> projetos = projetoService.findByEquipeId(equipeId);
+        return ResponseEntity.ok(projetos);
+    }
+
+    // Cria um novo projeto
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CONSULTOR')")
+    public ResponseEntity<ProjetoViewDTO> create(@RequestBody ProjetoCreateDTO projetoCreateDTO) {
+        ProjetoViewDTO novoProjetoDTO = projetoService.create(projetoCreateDTO);
+        return ResponseEntity.ok(novoProjetoDTO);
+    }
+
+    // Atualiza um projeto existente
     @PutMapping("/{id}")
-    @PreAuthorize("@projetoService.usuarioTemAcesso(#id)")
-    public String atualizarProjeto(@PathVariable Long id, @RequestBody ProjetoDTO projetoDTO) {
-        projetoService.atualizarProjeto(id, projetoDTO);
-        return "Projeto atualizado com sucesso!";
+    @PreAuthorize("hasRole('ADMIN') or @projetoService.isOwner(#id, authentication.principal.id)")
+    public ResponseEntity<ProjetoViewDTO> update(@PathVariable Long id, @RequestBody ProjetoCreateDTO projetoCreateDTO) {
+        ProjetoViewDTO projetoAtualizadoDTO = projetoService.update(id, projetoCreateDTO);
+        return ResponseEntity.ok(projetoAtualizadoDTO);
     }
 
-    // Excluir um projeto (somente ADMIN pode excluir)
+    // Deleta um projeto
     @DeleteMapping("/{id}")
-    @PreAuthorize("@projetoService.usuarioTemAcesso(#id)")
-    public String excluirProjeto(@PathVariable Long id) {
-        projetoService.excluirProjeto(id);
-        return "Projeto excluído com sucesso!";
+    @PreAuthorize("hasRole('ADMIN') or @projetoService.isOwner(#id, authentication.principal.id)")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        projetoService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

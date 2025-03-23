@@ -23,6 +23,10 @@ public class Usuario {
 	@Column(nullable = false)
 	private String senha;
 	
+	@ManyToOne
+    @JoinColumn(name = "equipe_id")
+    private Equipe equipe;
+	
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	private Role role;

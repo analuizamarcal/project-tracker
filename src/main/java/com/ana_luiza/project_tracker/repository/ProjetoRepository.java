@@ -7,5 +7,10 @@ import java.util.List;
 
 @Repository
 public interface ProjetoRepository extends JpaRepository<Projeto, Long> {
+    
+    // Busca projetos de uma equipe
+    List<Projeto> findByEquipeId(Long equipeId);
+    
+    // Busca projetos onde o usuário é o dono (caso ainda seja necessário)
     List<Projeto> findByUsuarioId(Long usuarioId);
 }

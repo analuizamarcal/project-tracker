@@ -1,110 +1,99 @@
 package com.ana_luiza.project_tracker.service;
 
-import com.ana_luiza.project_tracker.dto.ProjetoDTO;
-import com.ana_luiza.project_tracker.mapper.ProjetoMapper;
+import com.ana_luiza.project_tracker.dto.ProjetoCreateDTO;
+import com.ana_luiza.project_tracker.dto.ProjetoViewDTO;
+import com.ana_luiza.project_tracker.model.Equipe;
 import com.ana_luiza.project_tracker.model.Projeto;
 import com.ana_luiza.project_tracker.model.Usuario;
+import com.ana_luiza.project_tracker.model.Projeto.StatusProjeto;
+import com.ana_luiza.project_tracker.repository.EquipeRepository;
 import com.ana_luiza.project_tracker.repository.ProjetoRepository;
 import com.ana_luiza.project_tracker.repository.UsuarioRepository;
-import com.ana_luiza.project_tracker.security.JwtService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ProjetoService {
 
-    private final ProjetoRepository projetoRepository;
-    private final UsuarioRepository usuarioRepository;
-    private final JwtService jwtService;
+    @Autowired
+    private ProjetoRepository projetoRepository;
 
-    // Criar um projeto associado ao usuário autenticado
-    public ProjetoDTO criarProjeto(ProjetoDTO projetoDTO) {
-        Long usuarioId = jwtService.getAuthenticatedUserId();
-        if (usuarioId == null) {
-            throw new AccessDeniedException("Usuário não autenticado.");
-        }
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
-        Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+    @Autowired
+    private EquipeRepository equipeRepository;
 
-        Projeto projeto = ProjetoMapper.toEntity(projetoDTO);
-        projeto.setUsuario(usuario);
-
-        Projeto projetoSalvo = projetoRepository.save(projeto);
-        return ProjetoMapper.toDTO(projetoSalvo);
-    }
-
-    // Listar todos os projetos do usuário autenticado
-    public List<ProjetoDTO> listarProjetos() {
-        Long usuarioId = jwtService.getAuthenticatedUserId();
-        if (usuarioId == null) {
-            throw new AccessDeniedException("Usuário não autenticado.");
-        }
-
-        return projetoRepository.findByUsuarioId(usuarioId)
-                .stream()
-                .map(ProjetoMapper::toDTO)
+    // Busca todos os projetos
+    public List<ProjetoViewDTO> findAll() {
+        return projetoRepository.findAll().stream()
+                .map(ProjetoViewDTO::fromProjeto)
                 .collect(Collectors.toList());
     }
 
-    // Buscar um projeto específico, garantindo que pertence ao usuário autenticado
-    public ProjetoDTO buscarProjetoPorId(Long id) {
+    // Busca um projeto por ID
+    public ProjetoViewDTO findById(Long id) {
         Projeto projeto = projetoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Projeto não encontrado!"));
-
-        validarPermissao(projeto);
-        return ProjetoMapper.toDTO(projeto);
-    }
-
-    // Atualizar um projeto, garantindo que pertence ao usuário autenticado
-    public ProjetoDTO atualizarProjeto(Long id, ProjetoDTO projetoDTO) {
-        Projeto projeto = projetoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Projeto não encontrado!"));
-
-        validarPermissao(projeto);
-
-        projeto.setNome(projetoDTO.getNome());
-        projeto.setDescricao(projetoDTO.getDescricao());
-        projeto.setStatus(projetoDTO.getStatus());
-
-        Projeto projetoAtualizado = projetoRepository.save(projeto);
-        return ProjetoMapper.toDTO(projetoAtualizado);
-    }
-
-    // Excluir um projeto, garantindo que pertence ao usuário autenticado
-    public void excluirProjeto(Long id) {
-        Projeto projeto = projetoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Projeto não encontrado!"));
-
-        validarPermissao(projeto);
-        projetoRepository.delete(projeto);
-    }
-
-    // Verifica se o usuário autenticado tem permissão para acessar o projeto
-    private void validarPermissao(Projeto projeto) {
-        Long usuarioId = jwtService.getAuthenticatedUserId();
-        if (!projeto.getUsuario().getId().equals(usuarioId)) {
-            throw new AccessDeniedException("Você não tem permissão para acessar este projeto.");
-        }
+                .orElseThrow(() -> new RuntimeException("Projeto não encontrado"));
+        return ProjetoViewDTO.fromProjeto(projeto);
     }
     
-    // Método que verifica se o usuário autenticado tem acesso ao projeto
-    public boolean usuarioTemAcesso(Long projetoId) {
-        Projeto projeto = projetoRepository.findById(projetoId)
+    // Busca projetos por ID da equipe
+    public List<ProjetoViewDTO> findByEquipeId(Long equipeId) {
+        return projetoRepository.findByEquipeId(equipeId).stream()
+                .map(ProjetoViewDTO::fromProjeto)
+                .collect(Collectors.toList());
+    }
+    
+    // Busca projetos por ID do usuário
+    public List<ProjetoViewDTO> findByUsuarioId(Long usuarioId) {
+        return projetoRepository.findByUsuarioId(usuarioId).stream()
+                .map(ProjetoViewDTO::fromProjeto)
+                .collect(Collectors.toList());
+    }
+
+    // Cria um novo projeto
+    public ProjetoViewDTO create(ProjetoCreateDTO projetoCreateDTO) {
+        Usuario usuario = getAuthenticatedUser();
+        Equipe equipe = equipeRepository.findById(projetoCreateDTO.getEquipeId())
+                .orElseThrow(() -> new RuntimeException("Equipe não encontrada"));
+
+        Projeto projeto = projetoCreateDTO.toProjeto(equipe, usuario);
+        projeto = projetoRepository.save(projeto);
+        return ProjetoViewDTO.fromProjeto(projeto);
+    }
+
+    // Atualiza um projeto existente
+    public ProjetoViewDTO update(Long id, ProjetoCreateDTO projetoCreateDTO) {
+        Projeto projeto = projetoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Projeto não encontrado"));
 
-        // Obtém o ID do usuário autenticado
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        Usuario usuario = usuarioRepository.findByEmail(username)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        projeto.setNome(projetoCreateDTO.getNome());
+        projeto.setDescricao(projetoCreateDTO.getDescricao());
+        projeto.setStatus(StatusProjeto.valueOf(projetoCreateDTO.getStatus())); // Corrigido
 
-        // Verifica se o usuário é o dono do projeto
-        return projeto.getUsuario().getId().equals(usuario.getId());
+        projeto = projetoRepository.save(projeto);
+        return ProjetoViewDTO.fromProjeto(projeto);
+    }
+
+    // Deleta um projeto
+    public void delete(Long id) {
+        projetoRepository.deleteById(id);
+    }
+
+    // Obtém o usuário autenticado
+    private Usuario getAuthenticatedUser() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails) principal).getUsername();
+            return usuarioRepository.findByEmail(username)
+                    .orElseThrow(() -> new RuntimeException("Usuário autenticado não encontrado"));
+        }
+        throw new RuntimeException("Usuário não autenticado");
     }
 }

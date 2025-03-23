@@ -1,98 +1,93 @@
 package com.ana_luiza.project_tracker.service;
 
-import com.ana_luiza.project_tracker.dto.TarefaDTO;
-import com.ana_luiza.project_tracker.mapper.TarefaMapper;
-import com.ana_luiza.project_tracker.model.Projeto;
+import com.ana_luiza.project_tracker.dto.TarefaCreateDTO;
+import com.ana_luiza.project_tracker.dto.TarefaViewDTO;
 import com.ana_luiza.project_tracker.model.Tarefa;
+import com.ana_luiza.project_tracker.repository.EquipeRepository;
 import com.ana_luiza.project_tracker.repository.ProjetoRepository;
 import com.ana_luiza.project_tracker.repository.TarefaRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
+import com.ana_luiza.project_tracker.repository.UsuarioRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class TarefaService {
 
-    private final TarefaRepository tarefaRepository;
-    private final ProjetoRepository projetoRepository;
-    private final ProjetoService projetoService;
+    @Autowired
+    private TarefaRepository tarefaRepository;
 
-    // Criar uma nova tarefa em um projeto específico
-    public TarefaDTO criarTarefa(Long projetoId, TarefaDTO tarefaDTO) {
-        Projeto projeto = projetoRepository.findById(projetoId)
-                .orElseThrow(() -> new RuntimeException("Projeto não encontrado!"));
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
-        validarPermissao(projeto);
-
-        Tarefa tarefa = TarefaMapper.toEntity(tarefaDTO, projeto);
-        tarefa.setProjeto(projeto);
-
-        Tarefa tarefaSalva = tarefaRepository.save(tarefa);
-        return TarefaMapper.toDTO(tarefaSalva);
-    }
-
-    // Listar todas as tarefas de um projeto
-    public List<TarefaDTO> listarTarefas(Long projetoId) {
-        Projeto projeto = projetoRepository.findById(projetoId)
-                .orElseThrow(() -> new RuntimeException("Projeto não encontrado!"));
-
-        validarPermissao(projeto);
-
-        return tarefaRepository.findByProjetoId(projetoId)
-                .stream()
-                .map(TarefaMapper::toDTO)
+    @Autowired
+    private EquipeRepository equipeRepository;
+    
+    @Autowired 
+    private ProjetoRepository projetoRepository;
+    
+    // Busca todas as tarefas
+    public List<TarefaViewDTO> findAll() {
+        return tarefaRepository.findAll().stream()
+                .map(TarefaViewDTO::fromTarefa)
                 .collect(Collectors.toList());
     }
 
-    // Buscar uma tarefa específica dentro de um projeto
-    public TarefaDTO buscarTarefaPorId(Long tarefaId) {
-        Tarefa tarefa = tarefaRepository.findById(tarefaId)
-                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada!"));
-
-        validarPermissao(tarefa.getProjeto());
-        return TarefaMapper.toDTO(tarefa);
-    }
-    
-    // Buscar ID do projeto através da tarefa
-    public Long buscarProjetoIdPorTarefa(Long tarefaId) {
-        Tarefa tarefa = tarefaRepository.findById(tarefaId)
-                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada!"));
-        return tarefa.getProjeto().getId();
+    // Busca uma tarefa por ID
+    public TarefaViewDTO findById(Long id) {
+        Tarefa tarefa = tarefaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada"));
+        return TarefaViewDTO.fromTarefa(tarefa);
     }
 
-    // Atualizar uma tarefa
-    public TarefaDTO atualizarTarefa(Long tarefaId, TarefaDTO tarefaDTO) {
-        Tarefa tarefa = tarefaRepository.findById(tarefaId)
-                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada!"));
+    // Busca tarefas por ID do projeto
+    public List<TarefaViewDTO> findByProjetoId(Long projetoId) {
+        return tarefaRepository.findByProjetoId(projetoId).stream()
+                .map(TarefaViewDTO::fromTarefa)
+                .collect(Collectors.toList());
+    }
 
-        validarPermissao(tarefa.getProjeto());
+    // Busca tarefas por ID do responsável (usuário)
+    public List<TarefaViewDTO> findByResponsavelId(Long responsavelId) {
+        return tarefaRepository.findByResponsavelId(responsavelId).stream()
+                .map(TarefaViewDTO::fromTarefa)
+                .collect(Collectors.toList());
+    }
+
+    // Cria uma nova tarefa
+    public TarefaViewDTO create(TarefaCreateDTO tarefaDTO) {
+        Tarefa tarefa = tarefaDTO.toTarefa(
+                projetoRepository.findById(tarefaDTO.getProjetoId())
+                        .orElseThrow(() -> new RuntimeException("Projeto não encontrado")),
+                equipeRepository.findById(tarefaDTO.getEquipeId())
+                        .orElseThrow(() -> new RuntimeException("Equipe não encontrada")),
+                usuarioRepository.findById(tarefaDTO.getResponsavelId())
+                        .orElseThrow(() -> new RuntimeException("Responsável não encontrado"))
+        );
+        Tarefa novaTarefa = tarefaRepository.save(tarefa);
+        return TarefaViewDTO.fromTarefa(novaTarefa);
+    }
+
+    // Atualiza uma tarefa existente
+    public TarefaViewDTO update(Long id, TarefaCreateDTO tarefaDTO) {
+        Tarefa tarefa = tarefaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada"));
 
         tarefa.setTitulo(tarefaDTO.getTitulo());
         tarefa.setDescricao(tarefaDTO.getDescricao());
         tarefa.setStatus(tarefaDTO.getStatus());
         tarefa.setDataLimite(tarefaDTO.getDataLimite());
+        tarefa.setResponsavel(usuarioRepository.findById(tarefaDTO.getResponsavelId())
+                .orElseThrow(() -> new RuntimeException("Responsável não encontrado")));
 
         Tarefa tarefaAtualizada = tarefaRepository.save(tarefa);
-        return TarefaMapper.toDTO(tarefaAtualizada);
+        return TarefaViewDTO.fromTarefa(tarefaAtualizada);
     }
 
-    // Excluir uma tarefa
-    public void excluirTarefa(Long tarefaId) {
-        Tarefa tarefa = tarefaRepository.findById(tarefaId)
-                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada!"));
-
-        validarPermissao(tarefa.getProjeto());
-        tarefaRepository.delete(tarefa);
-    }
-
-    // Valida se o usuário autenticado tem permissão para acessar o projeto
-    private void validarPermissao(Projeto projeto) {
-        if (!projetoService.usuarioTemAcesso(projeto.getId())) {
-            throw new AccessDeniedException("Você não tem permissão para acessar este projeto.");
-        }
+    // Deleta uma tarefa
+    public void delete(Long id) {
+        tarefaRepository.deleteById(id);
     }
 }

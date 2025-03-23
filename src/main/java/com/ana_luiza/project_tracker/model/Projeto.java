@@ -28,20 +28,24 @@ public class Projeto {
     private StatusProjeto status;
 
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(updatable = false) // Impede a atualização da data após a criação
+    @Column(updatable = false)
     private Date dataCriacao;
 
     @ManyToOne
     @JoinColumn(name = "usuario_id", nullable = false)
-    private Usuario usuario; // Dono do projeto
+    private Usuario usuario; // Dono do projeto (ainda pode existir)
+
+    @ManyToOne
+    @JoinColumn(name = "equipe_id", nullable = false)
+    private Equipe equipe; // Agora o projeto pertence a uma equipe
 
     @OneToMany(mappedBy = "projeto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @ToString.Exclude // Evita loop infinito na serialização
+    @ToString.Exclude
     private List<Tarefa> tarefas;
 
     @PrePersist
     protected void onCreate() {
-        this.dataCriacao = new Date(); // Define a data de criação automaticamente
+        this.dataCriacao = new Date();
     }
 
     public enum StatusProjeto {
