@@ -8,7 +8,7 @@ Em desenvolvimento
 
 ## Funcionalidades
 
--  Gerenciamento de usuários
+-  Gerenciamento de usuários e equipes
 - Cadastro e acompanhamento de projetos
 - Controle de prazos e status
 
